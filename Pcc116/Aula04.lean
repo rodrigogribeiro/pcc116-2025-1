@@ -1,18 +1,21 @@
 -- Aula 04. Programação funcional e recursividade 
 
 import Mathlib.Tactic.Basic
+import Mathlib.Data.Nat.Basic
 
--- 1. Números Naturais (definidos na biblioteca: Tipo Nat)
+-- 1. Números Naturais 
+--    (definidos na biblioteca: Tipo Nat, ℕ)
 
 inductive N where 
 | zero : N 
 | succ : N → N 
 deriving Repr 
--- zero, succ zero, succ (succ zero), ...
 
+-- zero, succ zero, succ (succ zero), ...
+--  0  , 1        , 2               , 
 -- convertendo entre N e Nat 
 
-def toN (n : Nat) : N := 
+def toN (n : ℕ) : N := 
   match n with 
   | 0 => N.zero 
   | k + 1 => N.succ (toN k)
@@ -31,11 +34,12 @@ open N
 infixl:60 " .+. " => plus 
 
 -- Lousa: execução de 
---    (succ (succ zero)) .+. (succ zero) 
+--    (succ (succ zero)) .+. (succ zero) = por (2)
+--    succ ((succ zero) .+. (succ zero)) = por (2)
+--    succ (succ (zero .+. (succ zero))) = por (1)
+--    succ (succ (succ zero))
 -- representando N como números 
-/-
-(succ (succ zero)) .+. (succ zero) =  
--/
+
 -- Primeiro lemma simples 
 
 -- obter uma igualdade trivial (x = x) por simplificação 
@@ -43,25 +47,42 @@ infixl:60 " .+. " => plus
 
 lemma plus_0_l (n : N) 
   : zero .+. n = n := by
-  sorry  
+   rfl 
 
 -- Segundo lemma 
 
 lemma plus_0_r (n : N) 
   : n .+. zero = n := by
-    sorry 
+  induction n with 
+  | zero =>
+    rfl 
+  | succ n' IHn' => 
+    simp [plus, IHn']
 
 lemma plus_succ m n 
   : succ (m .+. n) = m .+. succ n := by
-    sorry 
+    induction m with 
+    | zero =>
+      rfl
+    | succ m' IHm' => 
+      simp [plus, IHm']
+
 
 theorem plus_comm (n m : N) 
   : n .+. m = m .+. n := by 
-  sorry 
+  induction n with 
+  | zero => 
+    simp [plus_0_r, plus] 
+  | succ n' IHn' => 
+    simp [plus, IHn', plus_succ]
+   
 
 theorem plus_assoc (n m p) 
   : n .+. m .+. p = n .+. (m .+. p) := by
-  sorry 
+  induction n with
+  | zero => rfl 
+  | succ n' IHm' =>
+    simp [plus, IHm']
 
 -- implementar multiplicação e sua prova de comutatividade 
 -- e associatividade. 
@@ -94,11 +115,15 @@ def double (n : N) : N :=
   | succ n' => succ (succ (double n'))
 
 lemma double_correct n
-  : double n = n .+. n := by 
-  sorry 
+  : double n = n .+. n := by
+    induction n with 
+    | zero =>
+      simp [double, plus]
+    | succ n' IHn' => 
+      simp [double, plus, IHn', plus_succ]
 
-lemma double_correct1 n : double n = (toN 2) .*. n := by 
-  sorry 
+lemma double_correct1 n : double n = (toN 2) .*. n := by
+  simp [toN, mult, plus_0_r, double_correct]
 
 -- teste de igualdade 
 
@@ -121,15 +146,40 @@ lemma eqN_refl n : eqN n n = true := by
 ∀ (x : A), P x -- mais geral 
 
 A → P = ∀ (_ : A), P -- x não ocorre em P
+
+* soundness f = true -> P 
+* completeness P -> f = true 
 -/
 
 lemma eqN_sound n m
-  : eqN n m = true → n = m := by 
-  sorry 
+  : eqN n m = true → n = m := by
+  revert m 
+  induction n with 
+  | zero =>
+    intros m 
+    cases m with 
+    | zero =>
+      simp
+    | succ m' => 
+      simp [eqN]
+  | succ n' IH' =>
+    intros m 
+    cases m with 
+    | zero =>
+      simp [eqN]
+    | succ m' =>
+      simp [eqN]
+      intros H 
+      apply IH' 
+      exact H
 
 lemma eqN_complete n m 
   : n = m → eqN n m = true := by
-  sorry 
+    intros H 
+    rw [H] 
+    simp [eqN_refl]
+
+-- Exercício 2. 
 
 lemma eqN_sound_neq n m 
   : eqN n m = false → n ≠ m := sorry 
@@ -146,15 +196,37 @@ def leb (n m : N) : Bool :=
 infix:60 " .<=. " => leb 
 
 lemma leb_refl n : n .<=. n = true := by 
-  sorry 
+  induction n with 
+  | zero => simp [leb]
+  | succ n' IH => 
+    simp [leb, IH] 
 
 
 lemma leb_trans n : ∀ m p, n .<=. m → 
                            m .<=. p → 
                            n .<=. p := by
-  sorry 
+  induction n with 
+  | zero => 
+    intros H1 H2 
+    simp [leb] 
+  | succ n' IH => 
+    intros m p H1 H2
+    cases m with 
+    | zero =>
+      cases p with 
+      | zero =>
+        simp [leb] at * 
+      | succ p' => 
+        simp [leb] at *
+    | succ m' => 
+      cases p with 
+      | zero => 
+        simp [leb] at *
+      | succ p' => 
+        simp [leb] at * 
+        apply IH <;> assumption
 
--- * Exercício 02: prove que ≤ é anti simétrica.
+-- * Exercício 03: prove que ≤ é anti simétrica.
 
 lemma leb_antisym n : ∀ m, n .<=. m → 
                            m .<=. n → 
@@ -164,7 +236,7 @@ lemma leb_antisym n : ∀ m, n .<=. m →
 lemma le_plus_l : ∀ n m, n .<=. (n .+. m) := by
   sorry 
 
--- * Exercício 03: Prove o seguinte lema.
+-- * Exercício 04: Prove o seguinte lema.
 
 lemma plus_le_compat 
   : ∀ n m p, n .<=. m → 
